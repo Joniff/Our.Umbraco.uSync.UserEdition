@@ -1,0 +1,24 @@
+﻿<?xml version="1.0"?>
+<package>
+  <metadata>
+	<id>Our.Umbraco.uSync.UserEdition</id>
+	<version>1.0.0</version>
+	<title>Our.Umbraco.uSync.UserEdition</title>
+	<authors>Jonathan Richards</authors>
+	<owners>Joniff</owners>
+	<licenseUrl>https://raw.githubusercontent.com/Joniff/Our.Umbraco.uSync.UserEdition/master/docs/Licence.txt</licenseUrl>
+	<iconUrl>https://raw.githubusercontent.com/Joniff/Our.Umbraco.uSync.UserEdition/master/docs/UserEditon.ico</iconUrl>
+	<requireLicenseAcceptance>false</requireLicenseAcceptance>
+	<description>Allows importing and exporting of Umbraco Users using uSync</description>
+	<releaseNotes>
+	  <![CDATA[You have to manually edit /config/uSyncBackOffice.Config file to include <HandlerConfig Name="uSync: UserHandler" Enabled="true" />]]>
+	</releaseNotes>
+	<copyright>Copyright 2020</copyright>
+	<tags>Umbraco uSync user</tags>
+	<dependencies>
+	  <dependency id="uSync" version="3.1.5.740" />
+	</dependencies>
+  </metadata>
+  <files>
+  </files>
+</package>
