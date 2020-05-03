@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{F808B805-CC58-40E3-91BC-9DEEB1D599BA}</ProjectGuid>
+    <ProjectGuid>{4637fa36-210e-47c7-9f80-25d1b918e7e5}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>uSync.UserEdition.Tests</RootNamespace>
@@ -56,7 +56,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\uSync.UserEdition\uSync.UserEdition.csproj">
-      <Project>{6821dbdb-123a-497b-ad28-9ed0ff464346}</Project>
+      <Project>{8b3b53ed-0d50-47f0-a320-82c071121b7d}</Project>
       <Name>uSync.UserEdition</Name>
     </ProjectReference>
   </ItemGroup>

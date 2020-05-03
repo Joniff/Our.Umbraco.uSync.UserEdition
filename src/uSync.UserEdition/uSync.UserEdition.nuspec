@@ -2,7 +2,7 @@
 <package>
   <metadata>
 	<id>Our.Umbraco.uSync.UserEdition</id>
-	<version>1.0.0</version>
+	<version>1.0.2</version>
 	<title>Our.Umbraco.uSync.UserEdition</title>
 	<authors>Jonathan Richards</authors>
 	<owners>Joniff</owners>

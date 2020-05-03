@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{6821DBDB-123A-497B-AD28-9ED0FF464346}</ProjectGuid>
+    <ProjectGuid>{8B3B53ED-0D50-47F0-A320-82C071121B7D}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Our.Umbraco.uSync.UserEdition</RootNamespace>
@@ -213,10 +213,12 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rdbms\ContentDto.cs" />
     <Compile Include="Rdbms\ContentVersionDto.cs" />
+    <Compile Include="Rdbms\UserDto.cs" />
     <Compile Include="Rdbms\MemberDto.cs" />
     <Compile Include="Rdbms\NodeDto.cs" />
     <Compile Include="Security\Cryptography.cs" />
     <Compile Include="Serializers\UserHandler.cs" />
+    <Compile Include="UserOragnisation\UserOrganisationService.cs" />
     <Compile Include="Xml\XmlExtensions.cs" />
   </ItemGroup>
   <ItemGroup>

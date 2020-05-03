@@ -7,6 +7,7 @@ using Jumoo.uSync.BackOffice;
 using Jumoo.uSync.BackOffice.Helpers;
 using Jumoo.uSync.Core;
 using Jumoo.uSync.Core.Mappers;
+using Our.Umbraco.uSync.UserEdition.UserOrganisation;
 using Umbraco.Core;
 using Umbraco.Core.Cache;
 using Umbraco.Core.Logging;
@@ -23,16 +24,17 @@ namespace uSync.UserEdition.Serializers
 	public class UserHandler : ISyncHandler
 	{
 		public string Name { get { return "uSync: UserHandler"; } }
-		public int Priority { get { return Jumoo.uSync.BackOffice.uSyncConstants.Priority.Content + 1; } }
+		public int Priority { get { return Jumoo.uSync.BackOffice.uSyncConstants.Priority.Content + 2; } }
 		public string SyncFolder { get { return "User"; } }
 
 		private IUserService _userService;
 		private IRuntimeCacheProvider _runtimeCacheProvider;
+		private UserOrganisationService _userOrganisationService;
 		private UmbracoDatabase Database;
 
 		private const string NodeName = "User";
 		private const string KeyAttribute = "Email";
-		private const string TypeAttribute = "Type";
+		private const string OrganisationAttribute = "Organisation";
 		private const string AliasAttribute = "Alias";
 		private const string NameAttribute = "Name";
 		private const string UserAttribute = "User";
@@ -61,11 +63,11 @@ namespace uSync.UserEdition.Serializers
 			_userService = ApplicationContext.Current.Services.UserService;
 			_runtimeCacheProvider = ApplicationContext.Current.ApplicationCache.RuntimeCache;
 			Database = ApplicationContext.Current.DatabaseContext.Database;
+			_userOrganisationService = new UserOrganisationService(_userService);
 		}
 
-		private string Filename(IUserType userType, IUser user) =>
-			Umbraco.Core.IO.IOHelper.MapPath(uSyncBackOfficeContext.Instance.Configuration.Settings.Folder + "//" + SyncFolder + "//" + userType.Alias + "//" + user.Email.ToSafeFileName().Replace('.', '-') + "." + FileExtension);
-
+		private string Filename(IUser user) =>
+			Umbraco.Core.IO.IOHelper.MapPath(uSyncBackOfficeContext.Instance.Configuration.Settings.Folder + "//" + SyncFolder + "//" +	user.Email.ToSafeFileName().Replace('.', '-') + "." + FileExtension);
 
 		public void RegisterEvents()
 		{
@@ -81,7 +83,7 @@ namespace uSync.UserEdition.Serializers
 			}
 			foreach (var user in e.SavedEntities)
 			{
-				ExportUser(user.UserType, user);
+				ExportUser(user);
 			}
 		}
 
@@ -93,7 +95,7 @@ namespace uSync.UserEdition.Serializers
 			}
 			foreach (var user in e.DeletedEntities)
 			{
-				uSyncIOHelper.ArchiveFile(Filename(user.UserType, user));
+				uSyncIOHelper.ArchiveFile(Filename(user));
 			}
 		}
 		
@@ -110,11 +112,12 @@ namespace uSync.UserEdition.Serializers
 		}
 
 
-		private XElement Serialize(IUserType userType, IUser user)
+		private XElement Serialize(IUser user)
 		{
+			var organisation = _userOrganisationService.GetOrganisation(user);
 			var node = new XElement(NodeName,
 				new XAttribute(KeyAttribute, user.Email),
-				new XAttribute(TypeAttribute, userType.Alias),
+				new XAttribute(OrganisationAttribute, organisation),
 				new XAttribute(NameAttribute, user.Name),
 				new XAttribute(UserAttribute, user.Username)
 			);
@@ -147,7 +150,7 @@ namespace uSync.UserEdition.Serializers
 			var cryptography = new Cryptography(user.Email + user.Name);
 			node.Add(new XElement(PasswordNode, cryptography.Encrypt(user.RawPasswordValue)));
 
-			System.Diagnostics.Debug.WriteLine($"Password Write for {user.Email} = {user.RawPasswordValue}");
+			//System.Diagnostics.Debug.WriteLine($"Password Write for {user.Email} = {user.RawPasswordValue}");
 
 			node.Add(new XElement(SecurityStampNode, user.SecurityStamp));
 			node.Add(new XElement(SectionsNode, string.Join(",", user.AllowedSections)));
@@ -155,18 +158,18 @@ namespace uSync.UserEdition.Serializers
 			return node.Normalize();
 		}
 
-		private uSyncAction ExportUser(IUserType userType, IUser user)
+		private uSyncAction ExportUser(IUser user)
 		{
-			if (userType == null || user == null)
+			if (user == null)
 			{
 				return uSyncAction.Fail("User", typeof(IUser), "User not set");
 			}
 
 			try
 			{
-				var node = Serialize(userType, user);
+				var node = Serialize(user);
 				var attempt = SyncAttempt<XElement>.Succeed(user.Email, node, typeof(IUser), ChangeType.Export);
-				var filename = Filename(userType, user);
+				var filename = Filename(user);
 				uSyncIOHelper.SaveNode(attempt.Item, filename);
 				return uSyncActionHelper<XElement>.SetAction(attempt, filename);
 			}
@@ -177,36 +180,15 @@ namespace uSync.UserEdition.Serializers
 			}
 		}
 
-		private IEnumerable<uSyncAction> ExportFolder(IUserType userType)
-		{
-			var actions = new List<uSyncAction>();
-			const int pageSize = 1000;
-			int page = 0;
-			int totalPages = 0;
-
-			IEnumerable<IUser> users;
-			do
-			{
-				users = _userService.GetAll(page++, pageSize, out totalPages);
-				foreach (var user in users.Where(x => x.UserType.Id == userType.Id))
-				{
-					actions.Add(ExportUser(userType, user));
-				}
-
-			}
-			while (users.Count() == pageSize);
-
-			return actions;
-		}
-
 		public IEnumerable<uSyncAction> ExportAll(string folder)
 		{
 			var actions = new List<uSyncAction>();
 			try
 			{
-				foreach (var userType in _userService.GetAllUserTypes())
+				var users = _userOrganisationService.GetUsers();
+				foreach (var user in users)
 				{
-					actions.AddRange(ExportFolder(userType));
+					actions.Add(ExportUser(user));
 				}
 			}
 			catch (Exception ex)
@@ -250,25 +232,26 @@ namespace uSync.UserEdition.Serializers
 
 		private bool? Deserialize(XElement node, bool force, out IUser user)
 		{
-			bool isNewUser = false;
 			var email = node.Attribute(KeyAttribute);
 			var name = node.Attribute(NameAttribute);
 			var userName = node.Attribute(UserAttribute);
-			var userType = node.Attribute(TypeAttribute);
+			var organisation = node.Attribute(OrganisationAttribute);
 			user = null;
 
-			if (email == null || name == null || userName == null || userType == null)
+			if (email == null || name == null || userName == null || organisation == null)
 			{
 				LogHelper.Warn<UserHandler>($"Error reading {node.Document.BaseUri}");
 				return null;
 			}
 
 			user = _userService.GetByEmail(email.Value);
-
 			if (user == null)
 			{
-				user = _userService.CreateUserWithIdentity(userName.Value, email.Value, _userService.GetUserTypeByAlias(userType.Value));
-				isNewUser = true;
+				user = _userOrganisationService.CreateUser(userName.Value, email.Value, organisation.Value);
+			}
+			else if (_userOrganisationService.GetOrganisation(user) != organisation.Value)
+			{
+				_userOrganisationService.SetOrganisation(user, organisation.Value);
 			}
 
 			var groups = new List<string>();
@@ -341,12 +324,27 @@ namespace uSync.UserEdition.Serializers
 			if (password != null)
 			{
 				var cryptography = new Cryptography(user.Email + user.Name);
-				user.RawPasswordValue = cryptography.Decrypt(password);
-
-				System.Diagnostics.Debug.WriteLine($"Password Read for {user.Email} = {user.RawPasswordValue}");
+				user.RawPasswordValue = password = cryptography.Decrypt(password);
+				//System.Diagnostics.Debug.WriteLine($"Password Read for {user.Email} = {user.RawPasswordValue}");
 			}
 
 			_userService.Save(user, true);
+
+			if (password != null)
+			{
+				//	Double check password is in database
+				var userDto = Database.SingleOrDefault<UserDto>(user.Id);
+				if (userDto == null)
+				{
+					LogHelper.Warn<UserHandler>($"Member {user.Id} doesn\'t exist in table umbracoUser even after we have just saved it");
+				}
+				else if (userDto.Password != password)
+				{
+					userDto.Password = password;
+					Database.Update(userDto);
+				}
+			}
+
 			return true;
 		}
 
@@ -375,31 +373,17 @@ namespace uSync.UserEdition.Serializers
 			return actions;
 		}
 
-		private IEnumerable<uSyncAction> ImportFolder(string folder, bool force)
-		{
-			var actions = new List<uSyncAction>();
-			if (Directory.Exists(folder))
-			{
-				foreach (var file in Directory.GetFiles(folder, FileFilter))
-				{
-					actions.AddRange(ImportFile(file, force));
-				}
-
-				foreach (var child in Directory.GetDirectories(folder))
-				{
-					actions.AddRange(ImportFolder(child, force));
-				}
-
-			}
-
-			return actions;
-		}
-
 		public IEnumerable<uSyncAction> ImportAll(string folder, bool force)
 		{
 			try
 			{
-				return ImportFolder(Umbraco.Core.IO.IOHelper.MapPath(folder), force);
+				var actions = new List<uSyncAction>();
+				foreach (var file in Directory.GetFiles(Umbraco.Core.IO.IOHelper.MapPath(folder), FileFilter))
+				{
+					actions.AddRange(ImportFile(file, force));
+				}
+
+				return actions;
 			}
 			catch (Exception ex)
 			{
@@ -414,9 +398,9 @@ namespace uSync.UserEdition.Serializers
 			var email = node.Attribute(KeyAttribute);
 			var name = node.Attribute(NameAttribute);
 			var user = node.Attribute(UserAttribute);
-			var userType = node.Attribute(TypeAttribute);
+			var organisation = node.Attribute(OrganisationAttribute);
 
-			if (email == null || name == null || user == null || userType == null)
+			if (email == null || name == null || user == null || organisation == null)
 			{
 				LogHelper.Warn<UserHandler>($"Error reading {node.ToString()}");
 				return null;
@@ -429,7 +413,7 @@ namespace uSync.UserEdition.Serializers
 				return false;
 			}
 
-			var compare = Serialize(existingUser.UserType, existingUser);
+			var compare = Serialize(existingUser);
 
 			return XNode.DeepEquals(node.Normalize(), compare);
 		}
